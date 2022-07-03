@@ -103,13 +103,13 @@ describe('Rentable NFT', () => {
       await expect(
         token.connect(renter).transferFrom(renter.address, guy.address, 1)
       ).to.be.revertedWith('RentableNFT: this token is rented')
-
-      await expect(token.finishRenting(1)).to.be.revertedWith(
-        'RentableNFT: this token is rented'
-      )
     })
 
     it('Early Finish', async () => {
+      await expect(token.finishRenting(1)).to.be.revertedWith(
+        'RentableNFT: this token is rented'
+      )
+
       await expect(token.connect(renter).finishRenting(1))
         .to.emit(token, 'FinishedRent')
         .withArgs(1, lord.address, renter.address, expiresAt)
@@ -117,6 +117,17 @@ describe('Rentable NFT', () => {
 
     it('After Expiration', async () => {
       await network.provider.send('evm_setNextBlockTimestamp', [expiresAt])
+
+      await expect(token.connect(guy).finishRenting(1))
+        .to.emit(token, 'FinishedRent')
+        .withArgs(1, lord.address, renter.address, expiresAt)
+    })
+
+    it('Vulnerability: Use finishRenting to return transfered token', async () => {
+      await network.provider.send('evm_setNextBlockTimestamp', [expiresAt * 10])
+      await token.connect(guy).finishRenting(1)
+
+      await token.connect(lord).transferFrom(lord.address, renter.address, 1)
 
       await expect(token.connect(guy).finishRenting(1))
         .to.emit(token, 'FinishedRent')
